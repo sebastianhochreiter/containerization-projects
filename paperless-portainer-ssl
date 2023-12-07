@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "8880:80"
+      - "8443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /etc/letsencrypt/live/SERVER_ADDRESS/fullchain.pem:/etc/nginx/certs/SERVER_ADDRESS.crt:ro
+      - /etc/letsencrypt/live/SERVER_ADDRESS/privkey.pem:/etc/nginx/certs/SERVER_ADDRESS.key:ro
+      - /etc/nginx/vhost.d
+      - /usr/share/nginx/html
+    networks:
+      - proxy-net
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx
+    depends_on:
+      - nginx-proxy
+    environment:
+      - PAPERLESS_ADMIN_USER=xxx  # Benutzername des Administrators
+      - PAPERLESS_ADMIN_PASSWORD=yyy  # Passwort des Administrators (ändern Sie dies!)
+      - VIRTUAL_HOST=SERVER_ADDRESS
+      - PAPERLESS_REDIS=redis://redis:6379
+      - PAPERLESS_URL=https://SERVER_ADDRESS:8443  # PORT IST ESSENTIELL
+      - ALLOWED_HOSTS=SERVER_ADDRESS
+
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+    networks:
+      - proxy-net
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=xxx
+      - POSTGRES_USER=xxx
+      - POSTGRES_PASSWORD=xxx
+    volumes:
+      - paperless_db:/var/lib/postgresql/data
+    networks:
+      - proxy-net
+
+  redis:
+    image: redis:alpine
+    networks:
+      - proxy-net
+
+networks:
+  proxy-net:
+    external: true
+
+volumes:
+  paperless_data:
+  paperless_media:
+  paperless_db:
